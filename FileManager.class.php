@@ -4,7 +4,6 @@ class FileManagerLinux {
     private $directoryInput;
     private $directoryOutput;
     private $action;
-    private $path;
     private $root;
     private $force = false;
     private $storage = [];
