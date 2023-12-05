@@ -12,7 +12,7 @@ class FileManagerLinux {
         $this->root = $root;
     }
 
-    private function basePath(string $in = '') {
+    private function basePath(string $in = ''): string {
         $in = $this->inFilter($in);
 
         $path = realpath($this->root . DIRECTORY_SEPARATOR . $in);
@@ -116,7 +116,7 @@ class FileManagerLinux {
         return $this->storage;
     }
 
-    private function template(object $directory) {
+    private function template(object $directory): void {
         $realDirectory = $directory->getRealPath();
         $fakeDirectory = trim(substr($realDirectory, strlen($this->directoryInput)), '/');
 
@@ -177,7 +177,7 @@ class FileManagerLinux {
         };
     }
 
-    private function sortResult(string $sortType, string $order){
+    private function sortResult(string $sortType, string $order): void {
         if (!in_array($order, ['asc', 'desc'])) {
             throw new Exception('Invalid order type. Available options: "asc", "desc".');
         };
@@ -215,7 +215,7 @@ class FileManagerLinux {
         if(!empty($this->storage['files']))   usort($this->storage['files'],   $sorting[$sortType]);
     }
 
-    private function formatBytes(int $bytes, int $precision = 2) {
+    private function formatBytes(int $bytes, int $precision = 2): string {
         $units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
     
         $bytes = max($bytes, 0);
@@ -227,7 +227,7 @@ class FileManagerLinux {
         return round($bytes, $precision) . $units[$pow];
     }
 
-    private function infoFolder(?string $directory = null) {
+    private function infoFolder(?string $directory = null): array {
         $directory = $directory ?? $this->directoryInput;
         $recursiveIterator = $this->recursiveSearch(false, true, $directory);
         
@@ -248,7 +248,7 @@ class FileManagerLinux {
         return [$size, $files, $folders];
     }
 
-    private function inFilter(string $in = '') {
+    private function inFilter(string $in = ''): string {
         $in = trim($in, '/');
         return in_array($in, ['.', '..']) ? '' : $in;
     }
