@@ -5,23 +5,12 @@ class FileManagerLinux {
     private $directoryOutput;
     private $action;
     private $root;
-    private $force = false;
+    private $force;
     private $storage = [];
 
-    public function __construct(string $root = '/tmp'){
+    public function __construct(string $root = '/tmp') {
         $this->root = $root;
-    }
-
-    private function basePath(string $in = ''): string {
-        $in = $this->inFilter($in);
-
-        $path = realpath($this->root . DIRECTORY_SEPARATOR . $in);
-
-        if ($path === false)                      throw new Exception('The input directory does not exist');
-        if (strpos($path, $this->root) === false) throw new Exception('Path not allowed');
-
-        return $path;
-    }
+    }   
 
     public function search(string $in, string $query, string $sortType = 'name', string $order = 'asc'): array {
         $this->directoryInput = $this->basePath($in);
@@ -39,6 +28,43 @@ class FileManagerLinux {
 
         $this->sortResult($sortType, $order);
         return $this->storage;
+    }
+
+    public function upload(string $in, array $file): void {
+        $directory = $this->basePath($in);
+
+        if (!@is_uploaded_file($file['tmp_name'])) {
+            throw new Exception('Not a valid entry');
+        };
+
+        if($file['error'] !== UPLOAD_ERR_OK) {
+            $errorMessages = array(
+                UPLOAD_ERR_INI_SIZE   => "The file exceeds the maximum size defined by the server.",
+                UPLOAD_ERR_FORM_SIZE  => "The file exceeds the maximum size defined in the HTML form.",
+                UPLOAD_ERR_PARTIAL    => "The file was only partially uploaded.",
+                UPLOAD_ERR_NO_FILE    => "No file was uploaded.",
+                UPLOAD_ERR_NO_TMP_DIR => "Missing a temporary directory.",
+                UPLOAD_ERR_CANT_WRITE => "Failed to write the file to disk.",
+                UPLOAD_ERR_EXTENSION  => "A PHP extension interrupted the upload."
+            );
+
+            $errorCode = $file['error'];
+            $errorMessage = 
+                $errorMessages[$errorCode ] ?? 
+                "Unknown error during upload. Code: $errorCode";
+
+            throw new Exception($errorMessage);
+        };
+
+        $callback = [];
+        $fileUploadName = $file['name'];
+        $fileTemporary  = $file['tmp_name'];
+
+        list($fileDiretory, $fileName, $index) = $this->autoRename($directory, $fileUploadName);
+
+        if (!@move_uploaded_file($fileTemporary, $fileDiretory)) {
+            throw new Exception('Failed to move to the directory');
+        };
     }
 
     public function explorer(string $in, string $sortType = 'name', string $order = 'asc'): array {
@@ -65,7 +91,11 @@ class FileManagerLinux {
 
     public function execute(string $action, string $in, ?string $out = null, bool $force = false): array {
         if (!in_array($action, ['copy', 'move', 'delete'])) {
-            throw new Exception("Action not recognized, use copy, move, or delete");
+            throw new Exception("Action not recognized, use copy, move, or delete.");
+        };
+
+        if (!in_array($force, ['both', 'replace'])) {
+            throw new Exception("Force mode not recognized, use both or replace.");
         };
 
         $this->action          = $action;
@@ -114,6 +144,43 @@ class FileManagerLinux {
         };
         
         return $this->storage;
+    }
+
+    public function basePath(string $in = ''): string {
+        $in = $this->inFilter($in);
+
+        $path = realpath($this->root . DIRECTORY_SEPARATOR . $in);
+
+        if ($path === false)                      throw new Exception('The input directory does not exist');
+        if (strpos($path, $this->root) === false) throw new Exception('Path not allowed');
+
+        return $path;
+    }
+
+    private function autoRename(string $in, ?string $name = null): array {
+        $directory = $name ? $in . DIRECTORY_SEPARATOR . $name : $in;
+
+        if(file_exists($directory) || is_link($directory)) {
+            $index = 0;
+        
+            $info      = pathinfo($directory);
+            $extension = $info['extension'];
+            $filename  = $info['filename'];
+
+            do {
+                ++$index;
+
+                $newName = "$filename-$index.$extension";
+                $testDirectory = dirname($directory) . DIRECTORY_SEPARATOR . $newName;
+
+            } while (file_exists($testDirectory) || is_link($testDirectory));
+        
+            $name = $newName;
+        };
+
+        $directory = dirname($directory) . DIRECTORY_SEPARATOR . $name;
+
+        return [$directory, $name, $index];
     }
 
     private function template(object $directory): void {
@@ -298,26 +365,20 @@ class FileManagerLinux {
         foreach($recursiveIterator as $directory) {
             $realDirectory = $directory->getRealPath();
 
-            if ($directory->isDir()){
-                $result = @rmdir($realDirectory);
-            } else {
-                $result = @unlink($realDirectory);
-            };
+            $result = $directory->isDir() ? @rmdir($realDirectory) : @unlink($realDirectory);
 
-            if (!$result) {
-                $this->storage[] = [
-                    'in'  => $realDirectory,
-                    'act' => $this->action
-                ];
-            };
-        };
-
-        if(!rmdir($this->directoryInput)) {
-            $this->storage[] = [
-                'in'  => $this->directoryInput,
+            if (!$result) $this->storage[] = [
+                'in'  => $realDirectory,
                 'act' => $this->action
             ];
+            
         };
+
+        if(!@rmdir($this->directoryInput)) $this->storage[] = [
+            'in'  => $this->directoryInput,
+            'act' => $this->action
+        ];
+
     }
 
     private function transfer(?string $directory = null, ?string $destiny = null) : void {
@@ -326,7 +387,10 @@ class FileManagerLinux {
 
         if(file_exists($destiny) || is_link($destiny)){
 
-            if($this->force) {
+            if ($this->force === 'both') {
+                list($newDestiny) = autoRename($destiny);
+                $destiny = $newDestiny;
+            } elseif ($this->force === 'replace') {
                 if (!@unlink($destiny)) {
                     $this->storage[] = [
                         'in'  => $directory,
@@ -372,5 +436,6 @@ class FileManagerLinux {
             ];
         };
     }
+
 };
 ?>
