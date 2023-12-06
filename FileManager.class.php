@@ -56,7 +56,6 @@ class FileManagerLinux {
             throw new Exception($errorMessage);
         };
 
-        $callback = [];
         $fileUploadName = $file['name'];
         $fileTemporary  = $file['tmp_name'];
 
