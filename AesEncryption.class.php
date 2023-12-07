@@ -1,17 +1,42 @@
 <?php 
-class AesEncryption{
-    const AES_METHOD = 'aes-256-cbc';
+/**
+ * AesEncryption class for encrypting and decrypting messages using AES encryption.
+ *
+ * @property string $password The encryption password.
+ * @property string $method The AES encryption method used.
+ */
+class AesEncryption {
+    private const SUPPORTED_METHODS = ['aes-128-cbc', 'aes-192-cbc', 'aes-256-cbc'];
 
     private $password;
+    private $method;
 
-    public function __construct($password) {
+    /**
+     * Constructor for the AesEncryption class.
+     *
+     * @param string $password The encryption password.
+     * @param string $method The AES encryption method (default: aes-256-cbc).
+     * @throws RuntimeException If OpenSSL version is vulnerable to Heartbleed or if the method is not supported.
+     */
+    public function __construct($password, $method = 'aes-256-cbc') {
         if (OPENSSL_VERSION_NUMBER <= 268443727) {
             throw new RuntimeException('OpenSSL Version too old, vulnerability to Heartbleed');
         }
 
+        if (!in_array($method, self::SUPPORTED_METHODS)) {
+            throw new RuntimeException('Unsupported AES encryption method');
+        }
+
         $this->password = $password;
+        $this->method = $method;
     }
 
+    /**
+     * Encrypts a message using AES encryption.
+     *
+     * @param string $message The message to be encrypted.
+     * @return string The encrypted message.
+     */
     public function encrypt(string $message) {
         $iv_size        = openssl_cipher_iv_length(self::AES_METHOD);
         $iv             = openssl_random_pseudo_bytes($iv_size);
@@ -21,6 +46,12 @@ class AesEncryption{
         return "$iv_hex:$ciphertext_hex";
     }
 
+    /**
+     * Decrypts an AES-encrypted message.
+     *
+     * @param string $ciphered The AES-encrypted message.
+     * @return string The decrypted message.
+     */
     public function decrypt(string $ciphered) {
         $iv_size    = openssl_cipher_iv_length(self::AES_METHOD);
         $data       = explode(":", $ciphered);
