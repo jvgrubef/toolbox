@@ -1,4 +1,20 @@
 <?php
+/**
+ * FileStream class for streaming large files over HTTP.
+ *
+ * Usage:
+ * $filePath = 'path/to/your/file';
+ * $fileStream = new FileStream($filePath);
+ *
+ * This class supports partial content requests (HTTP Range header) for efficient file streaming.
+ *
+ * @property string $path The path to the file to be streamed.
+ * @property resource $stream The file resource stream.
+ * @property int $buffer The buffer size for streaming.
+ * @property int $start The start position for partial content requests.
+ * @property int $end The end position for partial content requests.
+ * @property int $size The total size of the file.
+ */
 class FileStream{
 
     private $path   = "";
@@ -8,6 +24,11 @@ class FileStream{
     private $end    = -1;
     private $size   = 0;
     
+    /**
+     * Constructor for the FileStream class.
+     *
+     * @param string $filePath The path to the file to be streamed.
+     */
     function __construct($filePath) {
         $this->path = $filePath;
         $this->open();
@@ -16,6 +37,9 @@ class FileStream{
         $this->end();
     }
 
+    /**
+     * Opens the file stream or exits with a 403 Forbidden response if unsuccessful.
+     */
     private function open() {
         if (!($this->stream = fopen($this->path, 'rb'))) {
             http_response_code('403');
@@ -23,6 +47,9 @@ class FileStream{
         };
     }
 
+    /**
+     * Sets HTTP headers for content disposition, content type, caching, and partial content handling.
+     */
     private function setHeader() {
         ob_get_clean();
 
@@ -82,11 +109,9 @@ class FileStream{
         };
     }
 
-    private function end() {
-        fclose($this->stream);
-        exit;
-    }
-
+    /**
+     * Streams the file content in chunks, supporting partial content requests.
+     */
     private function stream() {
         $i = $this->start;
         set_time_limit(0);
@@ -105,5 +130,12 @@ class FileStream{
         };
     }
 
+    /**
+     * Closes the file stream and exits.
+     */
+    private function end() {
+        fclose($this->stream);
+        exit;
+    }
 };
 ?>
