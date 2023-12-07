@@ -1,5 +1,16 @@
 <?php
-class FileManagerLinux {
+/**
+ * FileManager class for handling file and directory operations.
+ *
+ * @property string $directoryInput The input directory or file path.
+ * @property string $directoryOutput The output directory path (for copy/move actions).
+ * @property string $action The action to perform (copy, move, delete).
+ * @property string $root The root directory for file operations.
+ * @property string $force Flag to force actions (both, replace).
+ * @property array $storage Storage for file and directory information.
+ */
+
+class FileManager {
 
     private $directoryInput;
     private $directoryOutput;
@@ -8,28 +19,22 @@ class FileManagerLinux {
     private $force;
     private $storage = [];
 
+    /**
+     * Constructor for the FileManager class.
+     *
+     * @param string $root The root directory for file operations.
+     */
     public function __construct(string $root = '/tmp') {
         $this->root = $root;
     }   
 
-    public function search(string $in, string $query, string $sortType = 'name', string $order = 'asc'): array {
-        $this->directoryInput = $this->basePath($in);
-
-        $recursiveIterator = $this->recursiveSearch(false);
-
-        foreach ($recursiveIterator as $directory) {
-            $realDirectory = $directory->getRealPath();
-            
-            $info = pathinfo($realDirectory);
-            if(stripos($info['filename'], $query) !== false || stripos($info['basename'], $query) !== false) {
-                $this->template($directory);
-            };
-        };
-
-        $this->sortResult($sortType, $order);
-        return $this->storage;
-    }
-
+    /**
+     * Uploads a file to the specified directory.
+     *
+     * @param string $in The target directory path.
+     * @param array $file The uploaded file data.
+     * @throws Exception If the upload fails or encounters an error.
+     */
     public function upload(string $in, array $file): void {
         $directory = $this->basePath($in);
 
@@ -66,6 +71,42 @@ class FileManagerLinux {
         };
     }
 
+    /**
+     * Searches for files or directories based on a query string.
+     *
+     * @param string $in The input directory or file path.
+     * @param string $query The search query.
+     * @param string $sortType The type of sorting (name, type, size, timeCreated, timeModified).
+     * @param string $order The sorting order (asc, desc).
+     * @return array Result of the search operation.
+     */
+    public function search(string $in, string $query, string $sortType = 'name', string $order = 'asc'): array {
+        $this->directoryInput = $this->basePath($in);
+
+        $recursiveIterator = $this->recursiveSearch(false);
+
+        foreach ($recursiveIterator as $directory) {
+            $realDirectory = $directory->getRealPath();
+            
+            $info = pathinfo($realDirectory);
+            if(stripos($info['filename'], $query) !== false || stripos($info['basename'], $query) !== false) {
+                $this->template($directory);
+            };
+        };
+
+        $this->sortResult($sortType, $order);
+        return $this->storage;
+    }
+
+    /**
+     * Explores the contents of a directory.
+     *
+     * @param string $in The input directory path.
+     * @param string $sortType The type of sorting (name, type, size, timeCreated, timeModified).
+     * @param string $order The sorting order (asc, desc).
+     * @return array Result of the exploration operation.
+     * @throws Exception If the input directory is invalid or not readable.
+     */
     public function explorer(string $in, string $sortType = 'name', string $order = 'asc'): array {
         
         $this->directoryInput = $this->basePath($in);
@@ -88,7 +129,17 @@ class FileManagerLinux {
         return $this->storage;
     }
 
-    public function execute(string $action, string $in, ?string $out = null, bool $force = false): array {
+    /**
+     * Executes file or directory operations (copy, move, delete).
+     *
+     * @param string $action The action to perform (copy, move, delete).
+     * @param string $in The input directory or file path.
+     * @param string|null $out The output directory path (for copy/move actions).
+     * @param string|null $force Flag to force actions (both, replace).
+     * @return array Result of the execution operation.
+     * @throws Exception If the action or force mode is not recognized, or if there are errors during execution.
+     */
+    public function execute(string $action, string $in, ?string $out = null, ?string $force = null): array {
         if (!in_array($action, ['copy', 'move', 'delete'])) {
             throw new Exception("Action not recognized, use copy, move, or delete.");
         };
@@ -145,6 +196,13 @@ class FileManagerLinux {
         return $this->storage;
     }
 
+    /**
+     * Resolves the absolute path for the provided relative path within the root directory.
+     *
+     * @param string $in The input directory or file path.
+     * @return string The absolute path.
+     * @throws Exception If the input directory does not exist or the path is not allowed.
+     */
     public function basePath(string $in = ''): string {
         $in = $this->inFilter($in);
 
@@ -156,6 +214,13 @@ class FileManagerLinux {
         return $path;
     }
 
+    /**
+     * Automatically renames a file or directory to avoid conflicts.
+     *
+     * @param string $in The target directory path.
+     * @param string|null $name The original name of the file or directory.
+     * @return array An array containing the new directory, name, and index.
+     */
     private function autoRename(string $in, ?string $name = null): array {
         $directory = $name ? $in . DIRECTORY_SEPARATOR . $name : $in;
 
@@ -182,6 +247,11 @@ class FileManagerLinux {
         return [$directory, $name, $index];
     }
 
+    /**
+     * Creates a structured representation of a file or directory and adds it to storage.
+     *
+     * @param object $directory An object representing a file or directory.
+     */
     private function template(object $directory): void {
         $realDirectory = $directory->getRealPath();
         $fakeDirectory = trim(substr($realDirectory, strlen($this->directoryInput)), '/');
@@ -243,6 +313,13 @@ class FileManagerLinux {
         };
     }
 
+     /**
+     * Sorts the results in storage based on the specified criteria.
+     *
+     * @param string $sortType The type of sorting (name, type, size, timeCreated, timeModified).
+     * @param string $order The sorting order (asc, desc).
+     * @throws Exception If the sort type or order is invalid.
+     */
     private function sortResult(string $sortType, string $order): void {
         if (!in_array($order, ['asc', 'desc'])) {
             throw new Exception('Invalid order type. Available options: "asc", "desc".');
@@ -281,7 +358,14 @@ class FileManagerLinux {
         if(!empty($this->storage['files']))   usort($this->storage['files'],   $sorting[$sortType]);
     }
 
-    private function formatBytes(int $bytes, int $precision = 2): string {
+    /**
+     * Formats the given size in bytes into a human-readable string.
+     *
+     * @param int $bytes The size in bytes.
+     * @param int $precision The number of decimal places.
+     * @return string The formatted size string.
+     */
+    public function formatBytes(int $bytes, int $precision = 2): string {
         $units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
     
         $bytes = max($bytes, 0);
@@ -293,6 +377,12 @@ class FileManagerLinux {
         return round($bytes, $precision) . $units[$pow];
     }
 
+    /**
+     * Retrieves information about the contents of a directory.
+     *
+     * @param string|null $directory The directory path (optional, defaults to the input directory).
+     * @return array An array containing the size, number of files, and number of folders.
+     */
     private function infoFolder(?string $directory = null): array {
         $directory = $directory ?? $this->directoryInput;
         $recursiveIterator = $this->recursiveSearch(false, true, $directory);
@@ -314,11 +404,25 @@ class FileManagerLinux {
         return [$size, $files, $folders];
     }
 
+    /**
+     * Filters and sanitizes the input directory or file path.
+     *
+     * @param string $in The input directory or file path.
+     * @return string The filtered and sanitized path.
+     */
     private function inFilter(string $in = ''): string {
         $in = trim($in, '/');
         return in_array($in, ['.', '..']) ? '' : $in;
     }
 
+    /**
+     * Performs a recursive search on the directory and returns an iterator.
+     *
+     * @param bool $childFirst Whether to process child elements first in the iteration.
+     * @param bool $subPath Whether to include sub-paths in the iterator.
+     * @param string|null $directory The directory to search (optional, defaults to the input directory).
+     * @return RecursiveIteratorIterator The recursive iterator.
+     */
     private function recursiveSearch(bool $childFirst = false, bool $subPath = true, ?string $directory = null): \RecursiveIteratorIterator {
         $directory = $directory ?? $this->directoryInput;
         $skipDots  = \RecursiveDirectoryIterator::SKIP_DOTS;
@@ -335,51 +439,12 @@ class FileManagerLinux {
         return $recursiveIterator;
     }
 
-    private function transferFolder(): void {
-        if (!is_dir($this->directoryOutput)) {
-            mkdir($this->directoryOutput, fileperms($this->directoryInput), true);
-        };
-
-        $recursiveIterator = $this->recursiveSearch(false);
-
-        foreach ($recursiveIterator as $directory) {
-            $destiny = $this->directoryOutput . DIRECTORY_SEPARATOR . $recursiveIterator->getSubPathname();
-            $realDirectory = $directory->getRealPath();
-
-            if ($directory->isDir()) {
-                if(!is_dir($destiny)) {
-                    mkdir($destiny, fileperms($realDirectory), true);
-                }
-
-                continue;
-            };
-
-            $this->transfer($directory->getRealPath(), $destiny);
-        };
-    }
-    
-    private function deleteFolder(): void {
-        $recursiveIterator = $this->recursiveSearch(true);
-
-        foreach($recursiveIterator as $directory) {
-            $realDirectory = $directory->getRealPath();
-
-            $result = $directory->isDir() ? @rmdir($realDirectory) : @unlink($realDirectory);
-
-            if (!$result) $this->storage[] = [
-                'in'  => $realDirectory,
-                'act' => $this->action
-            ];
-            
-        };
-
-        if(!@rmdir($this->directoryInput)) $this->storage[] = [
-            'in'  => $this->directoryInput,
-            'act' => $this->action
-        ];
-
-    }
-
+    /**
+     * Transfers a file or directory to a specified destination.
+     *
+     * @param string|null $directory The source directory or file path (optional, defaults to the input directory).
+     * @param string|null $destiny The destination directory or file path (optional, defaults to the output directory).
+     */
     private function transfer(?string $directory = null, ?string $destiny = null) : void {
         $directory = $directory ?? $this->directoryInput;
         $destiny   = $destiny   ?? $this->directoryOutput;
@@ -436,5 +501,55 @@ class FileManagerLinux {
         };
     }
 
+    /**
+     * Transfers the contents of a folder to a specified destination.
+     */
+    private function transferFolder(): void {
+        if (!is_dir($this->directoryOutput)) {
+            mkdir($this->directoryOutput, fileperms($this->directoryInput), true);
+        };
+
+        $recursiveIterator = $this->recursiveSearch(false);
+
+        foreach ($recursiveIterator as $directory) {
+            $destiny = $this->directoryOutput . DIRECTORY_SEPARATOR . $recursiveIterator->getSubPathname();
+            $realDirectory = $directory->getRealPath();
+
+            if ($directory->isDir()) {
+                if(!is_dir($destiny)) {
+                    mkdir($destiny, fileperms($realDirectory), true);
+                }
+
+                continue;
+            };
+
+            $this->transfer($directory->getRealPath(), $destiny);
+        };
+    }
+    
+    /**
+     * Deletes a folder and its contents.
+     */
+    private function deleteFolder(): void {
+        $recursiveIterator = $this->recursiveSearch(true);
+
+        foreach($recursiveIterator as $directory) {
+            $realDirectory = $directory->getRealPath();
+
+            $result = $directory->isDir() ? @rmdir($realDirectory) : @unlink($realDirectory);
+
+            if (!$result) $this->storage[] = [
+                'in'  => $realDirectory,
+                'act' => $this->action
+            ];
+            
+        };
+
+        if(!@rmdir($this->directoryInput)) $this->storage[] = [
+            'in'  => $this->directoryInput,
+            'act' => $this->action
+        ];
+
+    }
 };
 ?>
