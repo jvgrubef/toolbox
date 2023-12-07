@@ -223,10 +223,9 @@ class FileManager {
      */
     private function autoRename(string $in, ?string $name = null): array {
         $directory = $name ? $in . DIRECTORY_SEPARATOR . $name : $in;
+        $index = 0;
 
         if(file_exists($directory) || is_link($directory)) {
-            $index = 0;
-        
             $info      = pathinfo($directory);
             $extension = $info['extension'];
             $filename  = $info['filename'];
