@@ -74,7 +74,7 @@ class FileManager {
         $directory = $this->resolveAbsolutePath($in);
 
         if (!@is_uploaded_file($file['tmp_name'])) {
-            throw new Exception('Not a valid entry');
+            throw new Exception('Not a valid entry.');
         };
 
         if($file['error'] !== UPLOAD_ERR_OK) {
@@ -90,8 +90,8 @@ class FileManager {
 
             $errorCode = $file['error'];
             $errorMessage = 
-                $errorMessages[$errorCode ] ?? 
-                "Unknown error during upload. Code: $errorCode";
+                $errorMessages[$errorCode] ?? 
+                "Unknown error during upload. Code: $errorCode.";
 
             throw new Exception($errorMessage);
         };
@@ -106,7 +106,7 @@ class FileManager {
         list($fileDiretory, $fileName, $index) = $this->uniqueDirectory($directory, $fileUploadName);
 
         if (!@move_uploaded_file($fileTemporary, $fileDiretory)) {
-            throw new Exception('Failed to move to the directory');
+            throw new Exception('Failed to move to the directory.');
         };
     }
 
@@ -119,17 +119,17 @@ class FileManager {
      * @param string $order The sorting order (asc, desc).
      * @return array Result of the search operation.
      */
-    public function search(string $in, string $query, string $sortType = 'name', string $order = 'asc'): array {
-        $this->directoryInput = $this->resolveAbsolutePath($in);
-        
-        if (!$this->directoryInput) {
-            throw new Exception("The input directory does not exist");
+    public function search(string $in = '', string $query = '', string $sortType = 'name', string $order = 'asc'): array {
+        if(empty($query)){
+            throw new Exception("The search term is empty. Please provide a valid search term.");
         };
 
+        $this->directoryInput = $this->resolveAbsolutePath($in);
+
         if(is_file($this->directoryInput) || is_link($this->directoryInput)){
-            throw new Exception("The input directory is not a folder");
+            throw new Exception("The input directory is not a folder.");
         };
-        
+
         foreach ($this->recursiveSearch(false) as $directory) {
             $info = pathinfo($directory->getRealPath());
 
@@ -152,15 +152,10 @@ class FileManager {
      * @throws Exception If the input directory is invalid or not readable.
      */
     public function explorer(string $in = '', string $sortType = 'name', string $order = 'asc'): array {
-
         $this->directoryInput = $this->resolveAbsolutePath($in);
 
-        if (!$this->directoryInput) {
-            throw new Exception("The input directory does not exist");
-        };
-
         if(is_file($this->directoryInput) || is_link($this->directoryInput)){
-            throw new Exception("The input directory is not a folder");
+            throw new Exception("The input directory is not a folder.");
         };
 
         foreach ($this->recursiveSearch(false, false) as $directory) {
@@ -190,11 +185,11 @@ class FileManager {
         $mergeModeAllowed = ['both', 'merge'];
 
         if (!in_array($action, $actionsAllowed)) {
-            throw new Exception('Action not recognized, use: "' . implode('", "', $actionsAllowed) . '"');
+            throw new Exception('Action not recognized, use: "' . implode('", "', $actionsAllowed) . '".');
         };
 
         if ($forceMode !== null && !in_array($forceMode, $forceModeAllowed)) {
-            throw new Exception('forceMode mode not recognized, use: "' . implode('", "', $forceModeAllowed) . '"');
+            throw new Exception('forceMode mode not recognized, use: "' . implode('", "', $forceModeAllowed) . '".');
         };
 
         $this->action          = $action;
@@ -204,7 +199,7 @@ class FileManager {
 
         if ($this->isDir) {
             if ($mergeMode !== null && !in_array($mergeMode, $mergeModeAllowed)) {
-                throw new Exception('mergeMode mode not recognized, use: "' . implode('", "', $mergeModeAllowed) . '"');
+                throw new Exception('mergeMode mode not recognized, use: "' . implode('", "', $mergeModeAllowed) . '".');
             };
 
             $this->mergeMode = $mergeMode;
@@ -268,10 +263,29 @@ class FileManager {
 
         $in = realpath($this->root . DIRECTORY_SEPARATOR . $in);
 
-        if ($in === false)                      throw new Exception('The input directory does not exist');
-        if (strpos($in, $this->root) === false) throw new Exception('Path not allowed');
+        if ($in === false)                      throw new Exception('The input directory does not exist.');
+        if (strpos($in, $this->root) === false) throw new Exception('Path not allowed.');
 
         return $in;
+    }
+
+    /**
+     * Formats the given size in bytes into a human-readable string.
+     *
+     * @param int $bytes The size in bytes.
+     * @param int $precision The number of decimal places.
+     * @return string The formatted size string.
+     */
+    public function formatBytes(int $bytes, int $precision = 2): string {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+
+        $bytes = max($bytes, 0);
+        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+        $pow = min($pow, count($units) - 1);
+
+        $bytes /= pow(1024, $pow);
+
+        return round($bytes, $precision) . $units[$pow];
     }
 
     /**
@@ -427,25 +441,6 @@ class FileManager {
     }
 
     /**
-     * Formats the given size in bytes into a human-readable string.
-     *
-     * @param int $bytes The size in bytes.
-     * @param int $precision The number of decimal places.
-     * @return string The formatted size string.
-     */
-    public function formatBytes(int $bytes, int $precision = 2): string {
-        $units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-
-        $bytes = max($bytes, 0);
-        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-        $pow = min($pow, count($units) - 1);
-
-        $bytes /= pow(1024, $pow);
-
-        return round($bytes, $precision) . $units[$pow];
-    }
-
-    /**
      * Retrieves information about the contents of a directory.
      *
      * @param string|null $directory The directory path (optional, defaults to the input directory).
@@ -547,7 +542,7 @@ class FileManager {
             };
 
             if (!$result) {
-                throw new Exception('Transfer failed.');
+                throw new Exception("The $this->action operation failed.");
             };
 
             if ($permissions){
@@ -625,8 +620,7 @@ class FileManager {
     private function delete(): void {
         if (!$this->isDir) {
             if(@unlink($this->directoryInput)) $this->storage[] = [
-                'directory' => $this->directoryInput,
-                'action' => $this->action
+                'directory' => $this->directoryInput
             ];
             return;
         };
@@ -639,14 +633,12 @@ class FileManager {
                 @unlink($realDirectory)   ;
 
             if (!$result) $this->storage[] = [
-                'directory' => $realDirectory,
-                'action' => $this->action
+                'directory' => $realDirectory
             ];
         };
 
         if (!@rmdir($this->directoryInput)) $this->storage[] = [
-            'directory' => $this->directoryInput,
-            'action' => $this->action
+            'directory' => $this->directoryInput
         ];
     }
 };
