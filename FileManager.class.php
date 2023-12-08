@@ -259,7 +259,7 @@ class FileManager {
      */
     private function template(object $directory): void {
         $realDirectory = $directory->getRealPath();
-        $fakeDirectory = trim(substr($realDirectory, strlen($this->directoryInput)), '/');
+        $fakeDirectory = trim(substr($realDirectory, strlen($this->directoryInput)), DIRECTORY_SEPARATOR);
 
         $permissions = fileperms($realDirectory);
         $permissions = sprintf('%o', $permissions);
@@ -416,7 +416,7 @@ class FileManager {
      * @return string The filtered and sanitized path.
      */
     private function inFilter(string $in = ''): string {
-        $in = trim($in, '/');
+        $in = trim($in, DIRECTORY_SEPARATOR);
         return in_array($in, ['.', '..']) ? '' : $in;
     }
 
