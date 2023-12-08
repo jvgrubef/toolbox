@@ -33,6 +33,37 @@ class FileManager {
     }
 
     /**
+     * Retrieves information about the root directory.
+     *
+     * @return array An array containing information about the root directory.
+     */
+    public function rootInfo(): array {
+        $this->buildStorageStructure($this->root, true);
+        $rootInfo = $this->storage['folders'][0];
+        $availableSpace = disk_free_space($this->root);
+
+        $rootInfo['name'] = DIRECTORY_SEPARATOR;
+        $rootInfo['path'] = DIRECTORY_SEPARATOR;
+        
+        $size = $rootInfo['information']['size'];
+
+        $percentFreeSpace = round((($availableSpace / ($size['bytes'] + $availableSpace)) * 100), 2);
+
+        $size['percentage'] = 100 - $percentFreeSpace;
+
+        $rootInfo['information']['size'] = [
+            'used' => $size,
+            'available' => [
+                'size' => $availableSpace,
+                'formatted' => $this->formatBytes($availableSpace),
+                'percentage' => $percentFreeSpace
+            ]
+        ];
+
+        return $rootInfo;
+    }
+
+    /**
      * Uploads a file to the specified directory.
      *
      * @param string $in The target directory path.
@@ -63,6 +94,10 @@ class FileManager {
                 "Unknown error during upload. Code: $errorCode";
 
             throw new Exception($errorMessage);
+        };
+
+        if ($file['size'] > disk_free_space($this->root)) {
+            throw new Exception('Not enough disk space to upload this file.');
         };
 
         $fileUploadName = $file['name'];
@@ -200,6 +235,10 @@ class FileManager {
                 throw new Exception('The input directory is the same as the output directory.');
             };
 
+            if ($this->action === 'copy' && $this->getSize($this->directoryInput)[0] > disk_free_space($this->root)) {
+                throw new Exception('Not enough disk space to perform this action.');
+            };
+
             $this->isDir ? 
                 $this->transferFolder() :
                 $this->transfer()       ;
@@ -295,9 +334,9 @@ class FileManager {
         list($size, $files, $folders) = $this->getSize($realDirectory, $isDir);
 
         $base = [
-            'name'     => basename($realDirectory),
-            'path'     => $fakeDirectory,
-            'time'     => [
+            'name' => basename($realDirectory),
+            'path' => $fakeDirectory,
+            'time' => [
                 'created'  => [
                     'timestamp' => $created,
                     'formatted' => date('Y-m-d H:i:s', $created)
@@ -307,7 +346,7 @@ class FileManager {
                     'formatted' => date('Y-m-d H:i:s', $modified)
                 ]
             ],
-            'info'     => [
+            'information' => [
                 'type' => @mime_content_type($realDirectory),
                 'size' => [
                     'bytes'     => $size,
@@ -323,15 +362,15 @@ class FileManager {
             $permissions = sprintf('%o', $permissions);
             $permissions = substr($permissions, -4);
 
-            $base['info']['permissions'] = $permissions;
-            $base['info']['owner'] = posix_getpwuid(fileowner($realDirectory))['name'];
-            $base['info']['group'] = posix_getgrgid(filegroup($realDirectory))['name'];
+            $base['information']['permissions'] = $permissions;
+            $base['information']['owner'] = posix_getpwuid(fileowner($realDirectory))['name'];
+            $base['information']['group'] = posix_getgrgid(filegroup($realDirectory))['name'];
         };
 
-        if (is_int($files))   $base['info']['subfiles']   = $files;
-        if (is_int($folders)) $base['info']['subfolders'] = $folders;
+        if (is_int($files))   $base['information']['subfiles']   = $files;
+        if (is_int($folders)) $base['information']['subfolders'] = $folders;
 
-        $this->storage[$isDir ? 'folders' : 'files'][]    = $base;
+        $this->storage[$isDir ? 'folders' : 'files'][] = $base;
     }
 
     /**
