@@ -121,7 +121,15 @@ class FileManager {
      */
     public function search(string $in, string $query, string $sortType = 'name', string $order = 'asc'): array {
         $this->directoryInput = $this->resolveAbsolutePath($in);
+        
+        if (!$this->directoryInput) {
+            throw new Exception("The input directory does not exist");
+        };
 
+        if(is_file($this->directoryInput) || is_link($this->directoryInput)){
+            throw new Exception("The input directory is not a folder");
+        };
+        
         foreach ($this->recursiveSearch(false) as $directory) {
             $info = pathinfo($directory->getRealPath());
 
