@@ -637,7 +637,7 @@ class FileManager {
         };
 
         if (!@rmdir($this->directoryInput)) $this->storage[] = [
-            'directory' => $realDirectory,
+            'directory' => $this->directoryInput,
             'action' => $this->action
         ];
     }
