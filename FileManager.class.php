@@ -23,10 +23,10 @@ class FileManager {
     /**
      * Constructor for the FileManager class.
      *
-     * @param string $root The root directory for file operations.
+     * @param string|null $root The root directory for file operations. If not provided, the system's temporary directory will be used for enhanced security.
      */
-    public function __construct(string $root = '/tmp') {
-        $this->root = $root;
+    public function __construct(?string $root = null) {
+        $this->root = $root ?? sys_get_temp_dir();
     }   
 
     /**
@@ -84,10 +84,9 @@ class FileManager {
     public function search(string $in, string $query, string $sortType = 'name', string $order = 'asc'): array {
         $this->directoryInput = $this->basePath($in);
 
-        foreach ($this->recursiveSearch(false) as $directory) {
-            $realDirectory = $directory->getRealPath();
-            
-            $info = pathinfo($realDirectory);
+        foreach ($this->recursiveSearch(false) as $directory) {          
+            $info = pathinfo($directory->getRealPath());
+
             if(stripos($info['filename'], $query) !== false || stripos($info['basename'], $query) !== false) {
                 $this->template($directory);
             };
@@ -151,16 +150,19 @@ class FileManager {
         $this->action          = $action;
         $this->force           = $force;
         $this->directoryInput  = $this->basePath($in);
-        $this->directoryOutput = $out;
         $this->isDir           = is_dir($this->directoryInput);
 
-        if(!is_readable($this->directoryInput)){
+        if (!is_readable($this->directoryInput)) {
             throw new Exception('The previous directory cannot be read.');
         };
         
-        if(in_array($this->action, array_slice($actionsAllowed, 0, 2))) {
+        if (in_array($this->action, array_slice($actionsAllowed, 0, 2))) {
             if(!is_writable(dirname($this->directoryInput))){
                 throw new Exception('The previous directory cannot be written.');
+            };
+
+            if ($this->directoryInput === $this->root) {
+                throw new Exception('You cannot perform these actions in the root directory.');
             };
         };
 
@@ -261,10 +263,6 @@ class FileManager {
         $realDirectory = $directory->getRealPath();
         $fakeDirectory = trim(substr($realDirectory, strlen($this->directoryInput)), DIRECTORY_SEPARATOR);
 
-        $permissions = fileperms($realDirectory);
-        $permissions = sprintf('%o', $permissions);
-        $permissions = substr($permissions, -4);
-
         $created  = filectime($realDirectory);
         $modified = filemtime($realDirectory);
 
@@ -281,14 +279,20 @@ class FileManager {
                     'formatted' => date('Y-m-d H:i:s', $modified)
                 ]
             ],
-            'info'     => [
-                'permissions' => $permissions,
-                'owner' => posix_getpwuid(fileowner($realDirectory))['name'],
-                'group' => posix_getgrgid(filegroup($realDirectory))['name']
-            ],
+            'info'     => [],
             'readable' => is_readable($realDirectory),
             'writable' => is_writable($realDirectory)
         ];
+
+        if (PHP_OS !== 'WINNT'){
+            $permissions = fileperms($realDirectory);
+            $permissions = sprintf('%o', $permissions);
+            $permissions = substr($permissions, -4);
+
+            $base['info']['permissions'] = $permissions;
+            $base['info']['owner'] = posix_getpwuid(fileowner($realDirectory))['name'];
+            $base['info']['group'] = posix_getgrgid(filegroup($realDirectory))['name'];
+        };
 
         if ($directory->isDir()) {
             list($size, $files, $folders) = $this->infoFolder($realDirectory);
@@ -395,14 +399,12 @@ class FileManager {
         $size = $files = $folders = 0;
 
         foreach ($recursiveIterator as $directory) {
-            $realDirectory = $directory->getRealPath();
-
             if($directory->isDir()) {
                 ++$folders;
                 continue;
             };
 
-            $size += filesize($realDirectory);
+            $size += filesize($directory->getRealPath());
             ++$files;
         };
 
@@ -453,7 +455,6 @@ class FileManager {
     private function transfer(?string $directory = null, ?string $destiny = null) : void {
         $directory = $directory ?? $this->directoryInput;
         $destiny   = $destiny   ?? $this->directoryOutput;
-
         $result    = null;
 
         try {
@@ -471,7 +472,7 @@ class FileManager {
                 }
             };
             
-            $permissions = fileperms($directory);
+            $permissions = PHP_OS !== 'WINNT' ? fileperms($directory) : null;
 
             if ($this->action === 'move') {
                 $result = @rename($directory, $destiny);
@@ -485,10 +486,12 @@ class FileManager {
                 throw new Exception('Transfer failed.');
             };
 
-            if (!@chmod($destiny, $permissions)) {
-                throw new Exception('Failed to apply permissions.');
+            if ($permissions){
+                if (!@chmod($destiny, $permissions)) {
+                    throw new Exception('Failed to apply permissions.');
+                };
             };
-
+            
         } catch (Exception $e) {
             $this->storage[] = [
                 'directory' => [
@@ -508,7 +511,9 @@ class FileManager {
      */
     private function transferFolder(): void {
         if (!is_dir($this->directoryOutput)) {
-            mkdir($this->directoryOutput, fileperms($this->directoryInput), true);
+            PHP_OS !== 'WINNT' ?
+                mkdir($this->directoryOutput, fileperms($this->directoryInput), true): 
+                mkdir($this->directoryOutput, true);
         };
 
         $recursiveIterator = $this->recursiveSearch(false);        
@@ -518,7 +523,9 @@ class FileManager {
 
             if ($directory->isDir()) {
                 if(!is_dir($destiny)) {
-                    mkdir($destiny, fileperms($realDirectory), true);
+                    PHP_OS !== 'WINNT' ? 
+                        mkdir($destiny, fileperms($realDirectory), true):
+                        mkdir($destiny, true);
                 };
 
                 continue;
@@ -536,7 +543,7 @@ class FileManager {
     private function delete(): void {      
         if(!$this->isDir){ 
             if(@unlink($this->directoryInput)) $this->storage[] = [
-                'directory'  => $this->directoryInput,
+                'directory' => $this->directoryInput,
                 'action' => $this->action
             ];
             return;
@@ -550,16 +557,15 @@ class FileManager {
                 @unlink($realDirectory)   ;
 
             if (!$result) $this->storage[] = [
-                'directory'  => $realDirectory,
+                'directory' => $realDirectory,
                 'action' => $this->action
             ];
         };
 
         if(!@rmdir($this->directoryInput)) $this->storage[] = [
-            'directory'  => $realDirectory,
+            'directory' => $realDirectory,
             'action' => $this->action
         ];
     }
 };
-
 ?>
