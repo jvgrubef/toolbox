@@ -391,11 +391,11 @@ class FileManager {
                 return ($order == 'desc') ? -$result : $result;
             },
             'type' => function ($a, $b) use ($order) {
-                $result = strcmp($a['info']["type"], $b['info']["type"]);
+                $result = strcmp($a['information']["type"], $b['information']["type"]);
                 return ($order == 'desc') ? -$result : $result;
             },
             'size' => function ($a, $b) use ($order) {
-                $result = $a["info"]['size']['bytes'] - $b["info"]['size']['bytes'];
+                $result = $a["information"]['size']['bytes'] - $b["information"]['size']['bytes'];
                 return ($order == 'desc') ? -$result : $result;
             },
             'timeCreated' => function ($a, $b) use ($order) {
