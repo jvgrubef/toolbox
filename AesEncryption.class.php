@@ -37,7 +37,7 @@ class AesEncryption {
      * @param string $message The message to be encrypted.
      * @return string The encrypted message.
      */
-    public function encrypt(string $message) {
+    public function encrypt(string $message): string {
         $iv_size        = openssl_cipher_iv_length(self::AES_METHOD);
         $iv             = openssl_random_pseudo_bytes($iv_size);
         $ciphertext     = openssl_encrypt($message, self::AES_METHOD, $this->password, OPENSSL_RAW_DATA, $iv);
@@ -52,7 +52,7 @@ class AesEncryption {
      * @param string $ciphered The AES-encrypted message.
      * @return string The decrypted message.
      */
-    public function decrypt(string $ciphered) {
+    public function decrypt(string $ciphered: string {
         $iv_size    = openssl_cipher_iv_length(self::AES_METHOD);
         $data       = explode(":", $ciphered);
         $iv         = hex2bin($data[0]);
