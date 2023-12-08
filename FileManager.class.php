@@ -196,14 +196,6 @@ class FileManager {
         $this->forceMode       = $forceMode;
         $this->directoryInput  = $this->resolveAbsolutePath($in);
         $this->isDir           = is_dir($this->directoryInput);
-
-        if ($this->isDir) {
-            if ($mergeMode !== null && !in_array($mergeMode, $mergeModeAllowed)) {
-                throw new Exception('mergeMode mode not recognized, use: "' . implode('", "', $mergeModeAllowed) . '".');
-            };
-
-            $this->mergeMode = $mergeMode;
-        };
         
         if (!is_readable($this->directoryInput)) {
             throw new Exception('The previous directory cannot be read.');
@@ -242,10 +234,16 @@ class FileManager {
                 throw new Exception('Not enough disk space to perform this action.');
             };
 
-            $this->isDir ? 
-                $this->transferFolder() :
-                $this->transfer()       ;
-
+            if ($this->isDir) {
+                if ($mergeMode !== null && !in_array($mergeMode, $mergeModeAllowed)) {
+                    throw new Exception('mergeMode mode not recognized, use: "' . implode('", "', $mergeModeAllowed) . '".');
+                };
+    
+                $this->mergeMode = $mergeMode;
+                $this->transferFolder();
+            } else {
+                $this->transfer();
+            };
         };
 
         return $this->storage;
