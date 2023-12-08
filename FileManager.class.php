@@ -6,9 +6,11 @@
  * @property string $directoryInput The input directory or file path.
  * @property string $directoryOutput The output directory path (for copy/move actions).
  * @property string $action The action to perform (copy, move, delete).
+ * @property bool   $isDir A boolean indicating whether the provided path is a directory (true) or a file (false).
  * @property string $root The root directory for file operations.
- * @property string $force Flag to force actions (both, replace).
- * @property array $storage Storage for file and directory information.
+ * @property string $forceMode Flag to force actions (both, replace).
+ * @property string $mergeMode Flag to determine merge mode for directory actions (both, merge).
+ * @property array  $storage Storage for file and directory information.
  */
 class FileManager {
 
@@ -17,7 +19,8 @@ class FileManager {
     private $action;
     private $isDir;
     private $root;
-    private $force;
+    private $forceMode;
+    private $mergeMode;
     private $storage = [];
 
     /**
@@ -27,7 +30,7 @@ class FileManager {
      */
     public function __construct(?string $root = null) {
         $this->root = $root ?? sys_get_temp_dir();
-    }   
+    }
 
     /**
      * Uploads a file to the specified directory.
@@ -37,7 +40,7 @@ class FileManager {
      * @throws Exception If the upload fails or encounters an error.
      */
     public function upload(string $in, array $file): void {
-        $directory = $this->basePath($in);
+        $directory = $this->resolveAbsolutePath($in);
 
         if (!@is_uploaded_file($file['tmp_name'])) {
             throw new Exception('Not a valid entry');
@@ -65,7 +68,7 @@ class FileManager {
         $fileUploadName = $file['name'];
         $fileTemporary  = $file['tmp_name'];
 
-        list($fileDiretory, $fileName, $index) = $this->autoRename($directory, $fileUploadName);
+        list($fileDiretory, $fileName, $index) = $this->uniqueDirectory($directory, $fileUploadName);
 
         if (!@move_uploaded_file($fileTemporary, $fileDiretory)) {
             throw new Exception('Failed to move to the directory');
@@ -82,13 +85,13 @@ class FileManager {
      * @return array Result of the search operation.
      */
     public function search(string $in, string $query, string $sortType = 'name', string $order = 'asc'): array {
-        $this->directoryInput = $this->basePath($in);
+        $this->directoryInput = $this->resolveAbsolutePath($in);
 
-        foreach ($this->recursiveSearch(false) as $directory) {          
+        foreach ($this->recursiveSearch(false) as $directory) {
             $info = pathinfo($directory->getRealPath());
 
             if(stripos($info['filename'], $query) !== false || stripos($info['basename'], $query) !== false) {
-                $this->template($directory);
+                $this->buildStorageStructure($directory->getRealPath(), $directory->isDir());
             };
         };
 
@@ -106,18 +109,20 @@ class FileManager {
      * @throws Exception If the input directory is invalid or not readable.
      */
     public function explorer(string $in = '', string $sortType = 'name', string $order = 'asc'): array {
-        
-        $this->directoryInput = $this->basePath($in);
+
+        $this->directoryInput = $this->resolveAbsolutePath($in);
 
         if (!$this->directoryInput) {
             throw new Exception("The input directory does not exist");
         };
 
         if(is_file($this->directoryInput) || is_link($this->directoryInput)){
-            throw new Exception("The input directory is not a folder"); 
+            throw new Exception("The input directory is not a folder");
         };
 
-        foreach ($this->recursiveSearch(false, false) as $directory) $this->template($directory);
+        foreach ($this->recursiveSearch(false, false) as $directory) {
+            $this->buildStorageStructure($directory->getRealPath(), $directory->isDir());
+        };
 
         $this->sortResult($sortType, $order);
         $this->storage['path'] = $this->directoryInput;
@@ -128,48 +133,58 @@ class FileManager {
     /**
      * Executes file or directory operations (copy, move, delete).
      *
-     * @param string $action The action to perform (copy, move, delete).
-     * @param string $in The input directory or file path.
-     * @param string|null $out The output directory path (for copy/move actions).
-     * @param string|null $force Flag to force actions (both, replace).
+     * @param string          $action    The action to perform (copy, move, delete).
+     * @param string          $in        The input directory or file path.
+     * @param string|null     $out       The output directory path (for copy/move actions).
+     * @param string|null     $forceMode Flag to forceMode actions (both, replace).
+     * @param string|null     $mergeMode Flag to determine merge mode for directory actions (both, merge).
      * @return array Result of the execution operation.
-     * @throws Exception If the action or force mode is not recognized, or if there are errors during execution.
+     * @throws Exception If the action, forceMode or mergeMode is not recognized, or if there are errors during execution.
      */
-    public function execute(?string $action = null, ?string $in = null, ?string $out = null, ?string $force = null): array {
-        $actionsAllowed = ['delete', 'move', 'copy'];
-        $forceAllowed = ['both', 'replace'];
+    public function execute(?string $action = null, ?string $in = null, ?string $out = null, ?string $forceMode = null, ?string $mergeMode = null): array {
+        $actionsAllowed   = ['delete', 'move', 'copy'];
+        $forceModeAllowed = ['both', 'replace'];
+        $mergeModeAllowed = ['both', 'merge'];
 
         if (!in_array($action, $actionsAllowed)) {
             throw new Exception('Action not recognized, use: "' . implode('", "', $actionsAllowed) . '"');
         };
 
-        if ($force !== null && !in_array($force, $forceAllowed)) {
-            throw new Exception('Force mode not recognized, use: "' . implode('", "', $forceAllowed) . '"');
+        if ($forceMode !== null && !in_array($forceMode, $forceModeAllowed)) {
+            throw new Exception('forceMode mode not recognized, use: "' . implode('", "', $forceModeAllowed) . '"');
         };
 
         $this->action          = $action;
-        $this->force           = $force;
-        $this->directoryInput  = $this->basePath($in);
+        $this->forceMode       = $forceMode;
+        $this->directoryInput  = $this->resolveAbsolutePath($in);
         $this->isDir           = is_dir($this->directoryInput);
 
+        if ($this->isDir) {
+            if ($mergeMode !== null && !in_array($mergeMode, $mergeModeAllowed)) {
+                throw new Exception('mergeMode mode not recognized, use: "' . implode('", "', $mergeModeAllowed) . '"');
+            };
+
+            $this->mergeMode = $mergeMode;
+        };
+        
         if (!is_readable($this->directoryInput)) {
             throw new Exception('The previous directory cannot be read.');
         };
-        
-        if (in_array($this->action, array_slice($actionsAllowed, 0, 2))) {
-            if(!is_writable(dirname($this->directoryInput))){
-                throw new Exception('The previous directory cannot be written.');
-            };
 
+        if (in_array($this->action, array_slice($actionsAllowed, 0, 2))) {
             if ($this->directoryInput === $this->root) {
                 throw new Exception('You cannot perform these actions in the root directory.');
             };
+
+            if (!is_writable(dirname($this->directoryInput))) {
+                throw new Exception('The previous directory cannot be written.');
+            };           
         };
 
-        if($this->action === 'delete'){
+        if ($this->action === 'delete') {
             $this->delete();
         } else {
-            $directoryOutputReal = $this->basePath(@dirname($out));
+            $directoryOutputReal = $this->resolveAbsolutePath(@dirname($out));
 
             if(!is_readable($directoryOutputReal)){
                 throw new Exception('A destination directory cannot be read.');
@@ -179,7 +194,11 @@ class FileManager {
                 throw new Exception('The destination directory cannot be written.');
             };
 
-            $this->directoryOutput = $directoryOutputReal . DIRECTORY_SEPARATOR . $this->inFilter(@basename($this->directoryOutput));
+            $this->directoryOutput = $directoryOutputReal . DIRECTORY_SEPARATOR . $this->sanitizePath(@basename($out));
+
+            if($this->action === 'move' && $this->directoryOutput === $this->directoryInput){
+                throw new Exception('The input directory is the same as the output directory.');
+            };
 
             $this->isDir ? 
                 $this->transferFolder() :
@@ -197,8 +216,8 @@ class FileManager {
      * @return string The absolute path.
      * @throws Exception If the input directory does not exist or the path is not allowed.
      */
-    public function basePath(string $in = ''): string {
-        $in = $this->inFilter($in);
+    public function resolveAbsolutePath(string $in = ''): string {
+        $in = $this->sanitizePath($in);
 
         $in = realpath($this->root . DIRECTORY_SEPARATOR . $in);
 
@@ -228,24 +247,31 @@ class FileManager {
      * @param string|null $name The original name of the file or directory.
      * @return array An array containing the new directory, name, and index.
      */
-    private function autoRename(string $in, ?string $name = null): array {
+    private function uniqueDirectory(string $in, ?string $name = null): array {
         $directory = $name ? $in . DIRECTORY_SEPARATOR . $name : $in;
+        $isDir = is_dir($directory);
         $index = 0;
-        
-        if(file_exists($directory) || is_link($directory)) {
-        
-            $info      = pathinfo($directory);
-            $extension = $info['extension'];
-            $filename  = $info['filename'];
+
+        if($isDir || (file_exists($directory) || is_link($directory))) {
+
+            $info = pathinfo($directory);
+
+            if ($isDir) {
+                $filename  = $info['basename'];
+                $extension = '';
+            } else {
+                $filename  = $info['filename'];
+                $extension = '.' . $info['extension'];
+            };
 
             do {
                 ++$index;
 
-                $newName = "$filename-$index.$extension";
+                $newName = "$filename-$index$extension";
                 $testDirectory = dirname($directory) . DIRECTORY_SEPARATOR . $newName;
 
-            } while (file_exists($testDirectory) || is_link($testDirectory));
-        
+            } while (is_dir($testDirectory) || (file_exists($testDirectory) || is_link($testDirectory)));
+
             $name = $newName;
         };
 
@@ -257,29 +283,37 @@ class FileManager {
     /**
      * Creates a structured representation of a file or directory and adds it to storage.
      *
-     * @param object $directory An object representing a file or directory.
+     * @param string $directory An string representing a file or directory.
+     * @param bool $isDir A boolean indicating whether the provided path is a directory (true) or a file (false).
      */
-    private function template(object $directory): void {
-        $realDirectory = $directory->getRealPath();
-        $fakeDirectory = trim(substr($realDirectory, strlen($this->directoryInput)), DIRECTORY_SEPARATOR);
+    private function buildStorageStructure(string $realDirectory, bool $isDir): void {
+        $fakeDirectory = trim(substr($realDirectory, strlen($this->root)), DIRECTORY_SEPARATOR);
 
         $created  = filectime($realDirectory);
         $modified = filemtime($realDirectory);
+
+        list($size, $files, $folders) = $this->getSize($realDirectory, $isDir);
 
         $base = [
             'name'     => basename($realDirectory),
             'path'     => $fakeDirectory,
             'time'     => [
                 'created'  => [
-                    'timestamp' => $created, 
+                    'timestamp' => $created,
                     'formatted' => date('Y-m-d H:i:s', $created)
                 ],
                 'modified' => [
-                    'timestamp' => $modified, 
+                    'timestamp' => $modified,
                     'formatted' => date('Y-m-d H:i:s', $modified)
                 ]
             ],
-            'info'     => [],
+            'info'     => [
+                'type' => @mime_content_type($realDirectory),
+                'size' => [
+                    'bytes'     => $size,
+                    'formatted' => $this->formatBytes($size)
+                ]
+            ],
             'readable' => is_readable($realDirectory),
             'writable' => is_writable($realDirectory)
         ];
@@ -294,32 +328,10 @@ class FileManager {
             $base['info']['group'] = posix_getgrgid(filegroup($realDirectory))['name'];
         };
 
-        if ($directory->isDir()) {
-            list($size, $files, $folders) = $this->infoFolder($realDirectory);
+        if(is_int($files))   $base['info']['subfiles']   = $files;
+        if(is_int($folders)) $base['info']['subfolders'] = $folders;
 
-            $base['info']['type'] = 'directory';
-
-            $base['info']['size'] = [
-                'bytes'     => $size,
-                'formatted' => $this->formatBytes($size),
-            ];
-
-            $base['info']['subfiles']   = $files;
-            $base['info']['subfolders'] = $folders;
-
-            $this->storage['folders'][]  = $base;
-        }  else {
-            $size = filesize($realDirectory);
-
-            $base['info']['type'] = @mime_content_type($realDirectory);
-
-            $base['info']['size'] = [
-                'bytes'     => $size,
-                'formatted' => $this->formatBytes($size),
-            ];
-
-            $this->storage['files'][] = $base;
-        };
+        $this->storage[$isDir ? 'folders' : 'files'][]   = $base;
     }
 
     /**
@@ -333,7 +345,7 @@ class FileManager {
         if (!in_array($order, ['asc', 'desc'])) {
             throw new Exception('Invalid order type. Available options: "asc", "desc".');
         };
-        
+
         $sorting = [
             'name' => function ($a, $b) use ($order) {
                 $result = strcmp($a["name"], $b["name"]);
@@ -376,13 +388,13 @@ class FileManager {
      */
     public function formatBytes(int $bytes, int $precision = 2): string {
         $units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-    
+
         $bytes = max($bytes, 0);
         $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
         $pow = min($pow, count($units) - 1);
-    
+
         $bytes /= pow(1024, $pow);
-    
+
         return round($bytes, $precision) . $units[$pow];
     }
 
@@ -390,12 +402,18 @@ class FileManager {
      * Retrieves information about the contents of a directory.
      *
      * @param string|null $directory The directory path (optional, defaults to the input directory).
-     * @return array An array containing the size, number of files, and number of folders.
+     * @param bool|null   $isDir A boolean indicating whether the provided path is a directory (true) or a file (false).
      */
-    private function infoFolder(?string $directory = null): array {
+    private function getSize(?string $directory = null, ?bool $isDir = null): array {
         $directory = $directory ?? $this->directoryInput;
+        $isDir     = $isDir     ?? is_dir($directory);
+
+        if(!$isDir){
+            return [filesize($directory), null, null];
+        };
+
         $recursiveIterator = $this->recursiveSearch(false, true, $directory);
-        
+
         $size = $files = $folders = 0;
 
         foreach ($recursiveIterator as $directory) {
@@ -410,16 +428,15 @@ class FileManager {
 
         return [$size, $files, $folders];
     }
-    
+
     /**
      * Filters and sanitizes the input directory or file path.
      *
      * @param string $in The input directory or file path.
      * @return string The filtered and sanitized path.
      */
-    private function inFilter(string $in = ''): string {
-        $in = trim($in, DIRECTORY_SEPARATOR);
-        return in_array($in, ['.', '..']) ? '' : $in;
+    private function sanitizePath(string $in = ''): string {
+        return trim($in, DIRECTORY_SEPARATOR);
     }
 
     /**
@@ -434,12 +451,12 @@ class FileManager {
         $directory = $directory ?? $this->directoryInput;
         $skipDots  = \RecursiveDirectoryIterator::SKIP_DOTS;
 
-        $pathOption =  $subPath ? 
-            $childFirst ? 
-                \RecursiveIteratorIterator::CHILD_FIRST : 
+        $pathOption =  $subPath ?
+            $childFirst ?
+                \RecursiveIteratorIterator::CHILD_FIRST :
                 \RecursiveIteratorIterator::SELF_FIRST
             : $skipDots;
-        
+
         $recursiveDirectory = new \RecursiveDirectoryIterator($directory, $skipDots);
         $recursiveIterator  = new \RecursiveIteratorIterator($recursiveDirectory, $pathOption);
 
@@ -458,27 +475,27 @@ class FileManager {
         $result    = null;
 
         try {
-            list($newDestiny, $newName, $index) = $this->autoRename($destiny);
+            list($newDestiny, $newName, $index) = $this->uniqueDirectory($destiny);
 
             if($index > 0) {
-                if ($this->force === null) {
+                if ($this->forceMode === null) {
                     throw new Exception('There is already a directory with the same name at the destination.');
-                } elseif ($this->force === 'replace') {
+                } elseif ($this->forceMode === 'replace') {
                     if(!@unlink($destiny)) {
                         throw new Exception('Failed to delete the file in the destination directory.');
                     };
-                } elseif ($this->force === 'both') {
+                } elseif ($this->forceMode === 'both') {
                     $destiny = $newDestiny;
-                }
+                };
             };
-            
+
             $permissions = PHP_OS !== 'WINNT' ? fileperms($directory) : null;
 
             if ($this->action === 'move') {
                 $result = @rename($directory, $destiny);
             } else {
                 $result = is_link($directory)                 ?
-                    @symlink(@readlink($directory), $destiny) : 
+                    @symlink(@readlink($directory), $destiny) :
                     @copy($directory, $destiny)               ;
             };
 
@@ -491,7 +508,7 @@ class FileManager {
                     throw new Exception('Failed to apply permissions.');
                 };
             };
-            
+
         } catch (Exception $e) {
             $this->storage[] = [
                 'directory' => [
@@ -507,25 +524,44 @@ class FileManager {
     }
 
     /**
+     * Creates a directory recursively, considering file system permissions.
+     *
+     * @param string      $directory Path of the directory to be created.
+     * @param string|null $copy      Directory to be used as a reference for system permissions (optional).
+     */
+    private function makeFolder(string $directory, ?string $copy = null) {
+        echo $directory . PHP_EOL;
+        PHP_OS !== 'WINNT' && $copy !== null ?
+            mkdir($directory, fileperms($copy), true) :
+            mkdir($directory, true);
+    }
+
+    /**
      * Transfers the contents of a folder to a specified destination.
      */
     private function transferFolder(): void {
-        if (!is_dir($this->directoryOutput)) {
-            PHP_OS !== 'WINNT' ?
-                mkdir($this->directoryOutput, fileperms($this->directoryInput), true): 
-                mkdir($this->directoryOutput, true);
+        list($newDirectoryOutput, $newName, $index) = $this->uniqueDirectory($this->directoryOutput);
+
+        if ($index > 0) {
+            if ($this->mergeMode === null){
+                throw new Exception('There is already a folder directory with the same name at the destination.');
+            } elseif ($this->mergeMode === 'both') {
+                $this->directoryOutput = $newDirectoryOutput;
+                $this->makeFolder($this->directoryOutput, $this->directoryInput);
+            };
+        } else {
+            $this->makeFolder($this->directoryOutput, $this->directoryInput);
         };
 
-        $recursiveIterator = $this->recursiveSearch(false);        
+        $recursiveIterator = $this->recursiveSearch(false);
+
         foreach ($recursiveIterator as $directory) {
             $destiny = $this->directoryOutput . DIRECTORY_SEPARATOR . $recursiveIterator->getSubPathname();
             $realDirectory = $directory->getRealPath();
 
             if ($directory->isDir()) {
                 if(!is_dir($destiny)) {
-                    PHP_OS !== 'WINNT' ? 
-                        mkdir($destiny, fileperms($realDirectory), true):
-                        mkdir($destiny, true);
+                    $this->makeFolder($destiny, $realDirectory);
                 };
 
                 continue;
@@ -536,12 +572,12 @@ class FileManager {
 
         if($this->action === 'move') $this->cleanSubfolders($this->directoryInput);
     }
-    
+
     /**
      * Deletes a folder and its contents.
      */
-    private function delete(): void {      
-        if(!$this->isDir){ 
+    private function delete(): void {
+        if(!$this->isDir){
             if(@unlink($this->directoryInput)) $this->storage[] = [
                 'directory' => $this->directoryInput,
                 'action' => $this->action
@@ -553,7 +589,7 @@ class FileManager {
             $realDirectory = $directory->getRealPath();
 
             $result = $directory->isDir() ?
-                @rmdir($realDirectory)    : 
+                @rmdir($realDirectory)    :
                 @unlink($realDirectory)   ;
 
             if (!$result) $this->storage[] = [
