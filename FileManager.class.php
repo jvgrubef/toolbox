@@ -186,17 +186,17 @@ class FileManager {
         } else {
             $directoryOutputReal = $this->resolveAbsolutePath(@dirname($out));
 
-            if(!is_readable($directoryOutputReal)){
+            if (!is_readable($directoryOutputReal)){
                 throw new Exception('A destination directory cannot be read.');
             };
 
-            if(!is_writable($directoryOutputReal)) {
+            if (!is_writable($directoryOutputReal)) {
                 throw new Exception('The destination directory cannot be written.');
             };
 
             $this->directoryOutput = $directoryOutputReal . DIRECTORY_SEPARATOR . $this->sanitizePath(@basename($out));
 
-            if($this->action === 'move' && $this->directoryOutput === $this->directoryInput){
+            if ($this->action === 'move' && $this->directoryOutput === $this->directoryInput) {
                 throw new Exception('The input directory is the same as the output directory.');
             };
 
@@ -328,10 +328,10 @@ class FileManager {
             $base['info']['group'] = posix_getgrgid(filegroup($realDirectory))['name'];
         };
 
-        if(is_int($files))   $base['info']['subfiles']   = $files;
-        if(is_int($folders)) $base['info']['subfolders'] = $folders;
+        if (is_int($files))   $base['info']['subfiles']   = $files;
+        if (is_int($folders)) $base['info']['subfolders'] = $folders;
 
-        $this->storage[$isDir ? 'folders' : 'files'][]   = $base;
+        $this->storage[$isDir ? 'folders' : 'files'][]    = $base;
     }
 
     /**
@@ -530,7 +530,6 @@ class FileManager {
      * @param string|null $copy      Directory to be used as a reference for system permissions (optional).
      */
     private function makeFolder(string $directory, ?string $copy = null) {
-        echo $directory . PHP_EOL;
         PHP_OS !== 'WINNT' && $copy !== null ?
             mkdir($directory, fileperms($copy), true) :
             mkdir($directory, true);
@@ -560,7 +559,7 @@ class FileManager {
             $realDirectory = $directory->getRealPath();
 
             if ($directory->isDir()) {
-                if(!is_dir($destiny)) {
+                if (!is_dir($destiny)) {
                     $this->makeFolder($destiny, $realDirectory);
                 };
 
@@ -570,14 +569,14 @@ class FileManager {
             $this->transfer($realDirectory, $destiny);
         };
 
-        if($this->action === 'move') $this->cleanSubfolders($this->directoryInput);
+        if ($this->action === 'move') $this->cleanSubfolders($this->directoryInput);
     }
 
     /**
      * Deletes a folder and its contents.
      */
     private function delete(): void {
-        if(!$this->isDir){
+        if (!$this->isDir) {
             if(@unlink($this->directoryInput)) $this->storage[] = [
                 'directory' => $this->directoryInput,
                 'action' => $this->action
@@ -585,7 +584,7 @@ class FileManager {
             return;
         };
 
-        foreach($this->recursiveSearch(true) as $directory) {
+        foreach ($this->recursiveSearch(true) as $directory) {
             $realDirectory = $directory->getRealPath();
 
             $result = $directory->isDir() ?
@@ -598,7 +597,7 @@ class FileManager {
             ];
         };
 
-        if(!@rmdir($this->directoryInput)) $this->storage[] = [
+        if (!@rmdir($this->directoryInput)) $this->storage[] = [
             'directory' => $realDirectory,
             'action' => $this->action
         ];
