@@ -52,7 +52,7 @@ class AesEncryption {
      * @param string $ciphered The AES-encrypted message.
      * @return string The decrypted message.
      */
-    public function decrypt(string $ciphered: string {
+    public function decrypt(string $ciphered): string {
         $iv_size    = openssl_cipher_iv_length(self::AES_METHOD);
         $data       = explode(":", $ciphered);
         $iv         = hex2bin($data[0]);
