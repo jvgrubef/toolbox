@@ -349,6 +349,7 @@ class FileManager {
      *
      * @param string $directory An string representing a file or directory.
      * @param bool $isDir A boolean indicating whether the provided path is a directory (true) or a file (false).
+     * @param bool|null $ssf Optional. If true, the storage will be replaced with the created structure; if false, the structure will be added to the appropriate section (files or folders).
      */
     private function buildStorageStructure(string $realDirectory, bool $isDir, ?bool $ssf = null): void {
         $fakeDirectory = trim(substr($realDirectory, strlen($this->root)), DIRECTORY_SEPARATOR);
