@@ -33,34 +33,39 @@ class FileManager {
     }
 
     /**
-     * Retrieves information about the root directory.
+     * Retrieves information about a specified directory or the root directory if no input is provided.
      *
-     * @return array An array containing information about the root directory.
+     * @param string|null $in Optional. The path to the directory. If not provided, information about the root directory will be retrieved.
+     * @return array An array containing information about the specified or root directory.
      */
-    public function rootInfo(): array {
-        $this->buildStorageStructure($this->root, true);
-        $rootInfo = $this->storage['folders'][0];
-        $availableSpace = disk_free_space($this->root);
+    public function getDirectoryInfo(?string $in = null): array {
+        $this->directoryInput = $in ? $this->resolveAbsolutePath($in) : $this->root;
+        $this->isDir          = is_dir($this->directoryInput);
 
-        $rootInfo['name'] = DIRECTORY_SEPARATOR;
-        $rootInfo['path'] = DIRECTORY_SEPARATOR;
+        $this->buildStorageStructure($this->directoryInput, $this->isDir, true);
         
-        $size = $rootInfo['information']['size'];
+        if ($this->directoryInput === $this->root) {
+            $availableSpace = disk_free_space($this->root);
 
-        $percentFreeSpace = round((($availableSpace / ($size['bytes'] + $availableSpace)) * 100), 2);
+            $this->storage['name'] = DIRECTORY_SEPARATOR;
+            $this->storage['path'] = DIRECTORY_SEPARATOR;
+            $size = $this->storage['information']['size'];
 
-        $size['percentage'] = 100 - $percentFreeSpace;
+            $percentFreeSpace = round((($availableSpace / ($size['bytes'] + $availableSpace)) * 100), 2);
+    
+            $size['percentage'] = 100 - $percentFreeSpace;
+    
+            $this->storage['information']['size'] = [
+                'used' => $size,
+                'available' => [
+                    'size' => $availableSpace,
+                    'formatted' => $this->formatBytes($availableSpace),
+                    'percentage' => $percentFreeSpace
+                ]
+            ];
+        };
 
-        $rootInfo['information']['size'] = [
-            'used' => $size,
-            'available' => [
-                'size' => $availableSpace,
-                'formatted' => $this->formatBytes($availableSpace),
-                'percentage' => $percentFreeSpace
-            ]
-        ];
-
-        return $rootInfo;
+        return $this->storage;
     }
 
     /**
@@ -196,7 +201,7 @@ class FileManager {
         $this->forceMode       = $forceMode;
         $this->directoryInput  = $this->resolveAbsolutePath($in);
         $this->isDir           = is_dir($this->directoryInput);
-        
+
         if (!is_readable($this->directoryInput)) {
             throw new Exception('The previous directory cannot be read.');
         };
@@ -345,7 +350,7 @@ class FileManager {
      * @param string $directory An string representing a file or directory.
      * @param bool $isDir A boolean indicating whether the provided path is a directory (true) or a file (false).
      */
-    private function buildStorageStructure(string $realDirectory, bool $isDir): void {
+    private function buildStorageStructure(string $realDirectory, bool $isDir, ?bool $ssf = null): void {
         $fakeDirectory = trim(substr($realDirectory, strlen($this->root)), DIRECTORY_SEPARATOR);
 
         $created  = filectime($realDirectory);
@@ -390,7 +395,11 @@ class FileManager {
         if (is_int($files))   $base['information']['subfiles']   = $files;
         if (is_int($folders)) $base['information']['subfolders'] = $folders;
 
-        $this->storage[$isDir ? 'folders' : 'files'][] = $base;
+        if ($ssf) {
+            $this->storage = $base;
+        } else {
+            $this->storage[$isDir ? 'folders' : 'files'][] = $base;
+        };
     }
 
     /**
