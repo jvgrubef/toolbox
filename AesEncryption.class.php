@@ -38,9 +38,9 @@ class AesEncryption {
      * @return string The encrypted message.
      */
     public function encrypt(string $message): string {
-        $iv_size        = openssl_cipher_iv_length(self::AES_METHOD);
+        $iv_size        = openssl_cipher_iv_length($this->method);
         $iv             = openssl_random_pseudo_bytes($iv_size);
-        $ciphertext     = openssl_encrypt($message, self::AES_METHOD, $this->password, OPENSSL_RAW_DATA, $iv);
+        $ciphertext     = openssl_encrypt($message, $this->method, $this->password, OPENSSL_RAW_DATA, $iv);
         $ciphertext_hex = bin2hex($ciphertext);
         $iv_hex         = bin2hex($iv);
         return "$iv_hex:$ciphertext_hex";
@@ -53,11 +53,11 @@ class AesEncryption {
      * @return string The decrypted message.
      */
     public function decrypt(string $ciphered): string {
-        $iv_size    = openssl_cipher_iv_length(self::AES_METHOD);
+        $iv_size    = openssl_cipher_iv_length($this->method);
         $data       = explode(":", $ciphered);
         $iv         = hex2bin($data[0]);
         $ciphertext = hex2bin($data[1]);
-        return openssl_decrypt($ciphertext, self::AES_METHOD, $this->password, OPENSSL_RAW_DATA, $iv);
+        return openssl_decrypt($ciphertext, $this->method, $this->password, OPENSSL_RAW_DATA, $iv);
     }
 }
 ?>
