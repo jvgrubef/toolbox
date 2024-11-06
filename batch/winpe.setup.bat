@@ -5,52 +5,97 @@ cls
 
 wpeinit
 echo Carregando, aguarde.
-cls
+cls 
 
-rem Defina o servidor, onde quer montar e a letra da unidade que será listada:
-
-set "server=\\pxe-server.lan\PXE\"
+set "server_standard=\\10.0.100.8\PXE\"
 set "target_dir=Z:"
+set "username="
+set "password="
+
+:storageSetup
+
+echo Configuração de armazenamento:
+echo .
+echo Atual:
+echo Servidor: %server%.
+
+if not "%username%"=="" (
+    echo Usuário: %username%
+) else (
+    echo Usuário: não definido
+)
+
+if not "%password%"=="" (
+    echo Senha definida: Sim
+) else (
+    echo Senha definida: Não
+)
+
+set /p customChoice="Deseja customizar o caminho do servidor, usuário e senha? (S/N): "
+if /i "%customChoice%"=="S" (
+    set /p server="Digite o caminho do servidor no formato: \\X.X.X.X\pasta\ (deixe em branco para não alterar): "
+
+    if "%server%"=="" (
+        set "server=%server_standard%"
+    ) else (
+        set "server_standard=%server%"
+    )
+
+    set /p username="Digite o nome de usuário (deixe em branco se não precisar): "
+
+    if not "%username%"=="" (
+        set /p password="Digite a senha (deixe em branco se não precisar): "
+    ) else (
+        set "password="
+    )
+
+) else if /i "%customChoice%"=="N" (
+    goto netSetup
+) else (
+    echo Opção inválida
+    goto storageSetup
+)
 
 :netSetup
-echo Buscando arquivos em %server%, aguarde.
-net use %target_dir% %server%
 cls
+echo Buscando arquivos em %server%, aguarde.
+if not "%username%"=="" (
+    echo Usuário: %username%
+
+    if not "%password%"=="" (
+        echo Senha definida: Sim
+    ) else (
+        echo Senha definida: Não
+    )
+
+    net use %target_dir% %server% /user:%username% %password% /persistent:no >nul 2>&1
+) else (
+    echo Usuário: não definido
+    echo Senha definida: Não
+
+    net use %target_dir% %server% /persistent:no >nul 2>&1
+)
 
 if errorlevel 1 (
-    goto netError
+    set "errorMsg=Erro ao montar a pasta %server% na unidade %target_dir%. ^
+    Verifique a conexão de rede ou as permissões de acesso."
+    set "nextStep=storageSetup"
+    goto errorHandling
 ) else (
     goto menu
 )
 
-:netError
-echo Não foi possível montar a pasta %server% na unidade %target_dir%.
-echo Verifique a conexão de rede ou as permissões de acesso.
-
-rem Pergunta ao usuário se deseja tentar novamente ou sair
-set /p choice="Deseja tentar novamente ou sair? (1 para tentar / 2 para sair): "
-
-if /i "%choice%"=="1" (
-    goto netSetup
-) else if "%choice%"=="2" (
-    goto end
-) else (
-    echo Opção invalida
-    goto netError
-)
-
 :menu
-rem Muda para o diretório alvo
+cls
 cd /d "%target_dir%" || (
-    echo O diretório não existe!
-    exit /b
+    set "errorMsg=O diretório não existe ou não está acessível."
+    set "nextStep=menu"
+    goto errorHandling
 )
 
-rem Inicia contagem
 set count=0
 
-rem Lista os diretórios e cria opções
-echo Selecionar uma pasta seu corno:
+echo Selecionar uma pasta:
 echo -----------------------
 for /d %%D in (*) do (
     if /i not "%%D"=="WinPE" (
@@ -60,44 +105,70 @@ for /d %%D in (*) do (
     )
 )
 
-rem Verifica se existem pastas
 if %count% equ 0 (
-    echo Nenhuma pasta encontrada.
-    pause
-    exit /b
+    set "errorMsg=Nenhuma pasta encontrada."
+    set "nextStep=menu"
+    goto errorHandling
 )
 
 echo.
 echo Opções:
-echo 0 - Sair
-set /p choice="Escolha uma pasta (1-%count%) ou 0 para sair: "
+echo S - Sair
+echo R - Recarregar lista
+set /p choiceInstaller="Escolha uma pasta (1-%count%) ou 0 para sair: "
 
-rem Verifica se o usuário quer sair
-if "%choice%"=="0" (
+if /i "%choiceInstaller%"=="S" (
     goto end
 )
+if /i "%choiceInstaller%"=="R" (
+    goto menu
+)
 
-rem Verifica se a escolha é válida
-if "!folder[%choice%]!"=="" (
-    echo Opção inválida!
+echo %choiceInstaller% | findstr /r "^[1-9][0-9]*$" >nul
+if errorlevel 1 (
+    echo Opção inválida! Por favor, escolha S para sair, R para recarregar oU número de uma pasta existente.
+    goto menu
+)
+
+if "%choiceInstaller%" lss 1 if "%choiceInstaller%" gtr %count% (
+    echo Opção inválida! Por favor, escolha o número de uma pasta existente.
+    goto menu
+)
+
+if "!folder[%choiceInstaller%]!"=="" (
+    echo Opção inválida! Por favor, escolha uma pasta válida.
     goto menu
 )
 
 cls
-rem Exibe a pasta escolhida
-set "selected_folder=!folder[%choice%]!"
+set "selected_folder=!folder[%choiceInstaller%]!"
 
-rem Verifica se setup.exe existe na pasta escolhida
 if exist "!selected_folder!\setup.exe" (
     echo Você selecionou !selected_folder!, iniciando a instalação
     call "!selected_folder!\setup.exe"
 ) else (
-    echo Não foi encontrado o instalador ^(setup.exe^) na pasta !selected_folder!.
+    set "errorMsg=Não foi encontrado o instalador (setup.exe) na pasta !selected_folder!."
+    set "nextStep=menu"
+    goto errorHandling
 )
 
 echo.
 goto menu
 
+:errorHandling
+echo %errorMsg%
+set /p choiceError="Deseja tentar novamente ou sair? (S/N): "
+
+if /i "%choiceError%"=="S" (
+    goto %nextStep%
+) else if /i "%choiceError%"=="N" (
+    goto end
+) else (
+    echo Opção inválida.
+    goto errorHandling
+)
+
 :end
-echo Saindo, a maquina será reiniciada em breve.
+echo Saindo, a maquina será reiniciada em breve. Bye bye!
+echo %date% %time%
 wpeutil reboot
