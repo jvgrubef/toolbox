@@ -154,6 +154,7 @@ if not "%errorMenu%"=="" (
     cls
     echo %errorMenu%
     echo.
+    set "errorMenu="
 )
 
 cd /d "%target_dir%" || (
