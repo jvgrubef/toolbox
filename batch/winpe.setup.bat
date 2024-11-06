@@ -28,7 +28,7 @@ if "%1"=="" (
     echo * precisa ser executado em um novo script
     echo.
     echo * Como funciona?
-    echo * Você precisa ter um servidor Samba, e dentro da pasta compartilhada, devem ter as Iso's descompactada
+    echo * Você precisa ter um servidor Samba, e dentro da pasta compartilhada, devem ter as Iso's descompactadas
     echo * em pastas separadas, este script vai montar a pasta selecionada em Z:, e então dentro dessa unidade
     echo * vai procurar o executável setup.exe para iniciar a instalação
     echo.
