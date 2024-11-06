@@ -1,28 +1,77 @@
 @echo off
-setlocal enabledelayedexpansion
+title SK PXE AUX
+setlocal EnableDelayedExpansion
 chcp 65001
 cls
-
-wpeinit
-echo Carregando, aguarde.
-cls 
-
-set "server_standard=\\10.0.100.8\PXE\"
+echo. 
+echo     ██████  ██ ▄█▀    ██▓███  ▒██   ██▒▓█████     ▄▄▄       █    ██ ▒██   ██▒
+echo   ▒██    ▒  ██▄█▒    ▓██░  ██▒▒▒ █ █ ▒░▓█   ▀    ▒████▄     ██  ▓██▒▒▒ █ █ ▒░
+echo   ░ ▓██▄   ▓███▄░    ▓██░ ██▓▒░░  █   ░▒███      ▒██  ▀█▄  ▓██  ▒██░░░  █   ░
+echo     ▒   ██▒▓██ █▄    ▒██▄█▓▒ ▒ ░ █ █ ▒ ▒▓█  ▄    ░██▄▄▄▄██ ▓▓█  ░██░ ░ █ █ ▒ 
+echo   ▒██████▒▒▒██▒ █▄   ▒██▒ ░  ░▒██▒ ▒██▒░▒████▒    ▓█   ▓██▒▒▒█████▓ ▒██▒ ▒██▒
+echo   ▒ ▒▓▒ ▒ ░▒ ▒▒ ▓▒   ▒▓▒░ ░  ░▒▒ ░ ░▓ ░░░ ▒░ ░    ▒▒   ▓▒█░░▒▓▒ ▒ ▒ ▒▒ ░ ░▓ ░
+echo   ░ ░▒  ░ ░░ ░▒ ▒░   ░▒ ░     ░░   ░▒ ░ ░ ░  ░     ▒   ▒▒ ░░░▒░ ░ ░ ░░   ░▒ ░
+echo   ░  ░  ░  ░ ░░ ░    ░░        ░    ░     ░        ░   ▒    ░░░ ░ ░  ░    ░  
+echo         ░  ░  ░                ░    ░     ░  ░         ░  ░   ░      ░    ░  
+                                                                          
 set "target_dir=Z:"
+
+if "%1"=="" (
+    wpeinit > nul
+    net use %target_dir% /delete /y >nul 2>&1
+    endlocal > nul
+    start %~f0 "i" > nul
+    echo.
+
+    echo * Não feche ou clique em qualquer tecla dentro desta janela para manter o instalador em execução. 
+    echo * Do contrario a maquina será reiniciada. O script extra é feito por causa do programa NET, que para ^(re^)montagem
+    echo * precisa ser executado em um novo script
+    echo.
+    echo * Como funciona?
+    echo * Você precisa ter um servidor Samba, e dentro da pasta compartilhada, devem ter as Iso's descompactada
+    echo * em pastas separadas, este script vai montar a pasta selecionada em Z:, e então dentro dessa unidade
+    echo * vai procurar o executável setup.exe para iniciar a instalação
+    echo.
+    echo * Exemplo:
+    echo.
+    echo ^> \\endereço-do-servidor.local\
+    echo     └─ windows-files
+    echo        └─ windows_10^(x64^)
+    echo        ^|   └─ setup.exe e o restante dos arquivos da Iso descompactada.
+    echo        └─ windows_11^(x64^)
+    echo            └─ setup.exe e a mesma coisa do de cima.
+
+    pause >nul
+    goto end
+)
+
+title SK PXE AUX - Installer
+set "server_standard=\\10.0.100.8\PXE\"
+set "server=%server_standard%"
 set "username="
 set "password="
-
+set "errorMenu="
+set "errorMsg="
+set "nextStep="
+set "setServer= (deixe em branco para não alterar)"
 :storageSetup
+cls
 
 echo Configuração de armazenamento:
-echo .
+echo.
+
+if "%server_standard%"=="" (
+    set "setServer="
+    goto netData
+)
+
 echo Atual:
-echo Servidor: %server%.
+echo Servidor: %server_standard%
 
 if not "%username%"=="" (
     echo Usuário: %username%
 ) else (
-    echo Usuário: não definido
+    echo Usuário definido: Não
 )
 
 if not "%password%"=="" (
@@ -31,24 +80,11 @@ if not "%password%"=="" (
     echo Senha definida: Não
 )
 
+echo.
+
 set /p customChoice="Deseja customizar o caminho do servidor, usuário e senha? (S/N): "
 if /i "%customChoice%"=="S" (
-    set /p server="Digite o caminho do servidor no formato: \\X.X.X.X\pasta\ (deixe em branco para não alterar): "
-
-    if "%server%"=="" (
-        set "server=%server_standard%"
-    ) else (
-        set "server_standard=%server%"
-    )
-
-    set /p username="Digite o nome de usuário (deixe em branco se não precisar): "
-
-    if not "%username%"=="" (
-        set /p password="Digite a senha (deixe em branco se não precisar): "
-    ) else (
-        set "password="
-    )
-
+    goto netData
 ) else if /i "%customChoice%"=="N" (
     goto netSetup
 ) else (
@@ -56,9 +92,38 @@ if /i "%customChoice%"=="S" (
     goto storageSetup
 )
 
+:netData
+set /p server="Digite o caminho do servidor no formato: \\X.X.X.X\pasta\%setServer%: "
+
+if "%server%"=="" (
+    if "%setServer%"=="" (
+        cls
+        echo Configuração de armazenamento:
+        echo.
+        echo É necessário definir o servidor
+        goto netData
+    )
+    set "server=%server_standard%"
+) else (
+    set "server_standard=%server%"
+)
+
+set /p username="Digite o nome de usuário (deixe em branco se não precisar): "
+
+if "%username%"=="" (
+    set "password="
+    goto netSetup
+)
+
+set /p password="Digite a senha (deixe em branco se não precisar): "
+
 :netSetup
 cls
+
+echo A nova unidade %target_dir% está sendo montada.
 echo Buscando arquivos em %server%, aguarde.
+echo.
+
 if not "%username%"=="" (
     echo Usuário: %username%
 
@@ -68,25 +133,29 @@ if not "%username%"=="" (
         echo Senha definida: Não
     )
 
-    net use %target_dir% %server% /user:%username% %password% /persistent:no >nul 2>&1
+    net use %target_dir% %server% /user:%username% %password%
 ) else (
-    echo Usuário: não definido
+    echo Usuário definido: Não
     echo Senha definida: Não
 
-    net use %target_dir% %server% /persistent:no >nul 2>&1
+    net use %target_dir% %server%
 )
 
 if errorlevel 1 (
-    set "errorMsg=Erro ao montar a pasta %server% na unidade %target_dir%. ^
-    Verifique a conexão de rede ou as permissões de acesso."
+    set "errorMsg=Erro ao montar a pasta %server% na unidade %target_dir%. Verifique a conexão de rede ou as permissões de acesso."
     set "nextStep=storageSetup"
     goto errorHandling
-) else (
-    goto menu
 )
 
-:menu
 cls
+
+:menu
+if not "%errorMenu%"=="" (
+    cls
+    echo %errorMenu%
+    echo.
+)
+
 cd /d "%target_dir%" || (
     set "errorMsg=O diretório não existe ou não está acessível."
     set "nextStep=menu"
@@ -100,7 +169,7 @@ echo -----------------------
 for /d %%D in (*) do (
     if /i not "%%D"=="WinPE" (
         set /a count+=1
-        echo !count! - %%D
+        echo └─ !count! - %%D
         set "folder[!count!]=%%D"
     )
 )
@@ -113,30 +182,26 @@ if %count% equ 0 (
 
 echo.
 echo Opções:
-echo S - Sair
-echo R - Recarregar lista
-set /p choiceInstaller="Escolha uma pasta (1-%count%) ou 0 para sair: "
+echo -----------------------
+echo └─ S - Sair
+echo └─ R - Recarregar lista
+echo └─ V - Voltar a configuração de servidor
+echo.
+set /p choiceInstaller="Escolha uma pasta (1-%count%) ou uma das opções acima: "
 
 if /i "%choiceInstaller%"=="S" (
     goto end
 )
 if /i "%choiceInstaller%"=="R" (
+    cls
     goto menu
 )
-
-echo %choiceInstaller% | findstr /r "^[1-9][0-9]*$" >nul
-if errorlevel 1 (
-    echo Opção inválida! Por favor, escolha S para sair, R para recarregar oU número de uma pasta existente.
-    goto menu
-)
-
-if "%choiceInstaller%" lss 1 if "%choiceInstaller%" gtr %count% (
-    echo Opção inválida! Por favor, escolha o número de uma pasta existente.
-    goto menu
+if /i "%choiceInstaller%"=="V" (
+    goto reset
 )
 
 if "!folder[%choiceInstaller%]!"=="" (
-    echo Opção inválida! Por favor, escolha uma pasta válida.
+    set "errorMenu=Opção inválida! Por favor, escolha uma pasta válida."
     goto menu
 )
 
@@ -152,7 +217,6 @@ if exist "!selected_folder!\setup.exe" (
     goto errorHandling
 )
 
-echo.
 goto menu
 
 :errorHandling
@@ -168,7 +232,16 @@ if /i "%choiceError%"=="S" (
     goto errorHandling
 )
 
+:reset
+net use %target_dir% /delete /y
+endlocal
+start %~f0 "i" >nul
+cls
+echo Nos vemos em breve.
+exit
+
 :end
-echo Saindo, a maquina será reiniciada em breve. Bye bye!
-echo %date% %time%
+echo Saindo, a máquina será reiniciada em breve. Bye bye!
+echo %date% - %time%
+endlocal
 wpeutil reboot
