@@ -79,7 +79,7 @@ if "%CMVAR%"=="2" (
 )
 
 if "%CMVAR%"=="3" (
-	powershell -NoProfile -command "Restart-Service -Name Audiosrv -Confirm:$false"
+	start "" powershell -WindowStyle Hidden -command "Restart-Service -Name Audiosrv -Confirm:$false"
 	echo Feito - Serviço de áudio está reiniciando.
 	>nul 2>&1 timeout /t 2
 	goto:CHOICE_MENU
