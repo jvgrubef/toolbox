@@ -1,5 +1,5 @@
 @echo off
-chcp 65001
+chcp 65001 > nul
 
 >nul 2>&1 reg query "HKU\S-1-5-19\Environment"
 
@@ -79,7 +79,7 @@ if "%CMVAR%"=="2" (
 )
 
 if "%CMVAR%"=="3" (
-	start "" powershell -command "Restart-Service -Name Audiosrv -Confirm:$false"
+	powershell -NoProfile -command "Restart-Service -Name Audiosrv -Confirm:$false"
 	echo Feito - Serviço de áudio está reiniciando.
 	>nul 2>&1 timeout /t 2
 	goto:CHOICE_MENU
