@@ -1,5 +1,6 @@
 @echo off
 chcp 65001 > nul
+title "ViPER4Windows Fixer"
 
 >nul 2>&1 reg query "HKU\S-1-5-19\Environment"
 
@@ -11,7 +12,6 @@ if '%errorlevel%' NEQ '0' (
 	>nul 2>&1 del "%temp%\getadmin.vbs" 
 )
 
-title "ViPER4Windows Fixer"
 pushd "%~dp0"
 
 for /f "tokens=2*" %%X in ('REG QUERY "HKEY_LOCAL_MACHINE\SOFTWARE\ViPER4Windows" /v ConfigPath') do set PAPPDIR=%%Y
