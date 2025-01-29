@@ -41,15 +41,8 @@ iface bond0 inet manual
     bond-slaves eth2 eth3
 
 # VLANs sobre bond0
-auto bond-lan
-iface bond-lan inet manual
-    vlan-raw-device bond0
-    vlan-id 0
-
-auto bond-gst
-iface bond-gst inet manual
-    vlan-raw-device bond0
-    vlan-id 2
+auto bond0.2
+iface bond0.2 inet manual
 
 # Interface de console
 auto br-con
@@ -63,7 +56,7 @@ iface br-con inet static
 # LAN principal
 auto br-lan
 iface br-lan inet static
-    bridge_ports bond-lan
+    bridge_ports bond0
     bridge-stp off
     bridge-fd 0
     address 10.0.100.10
@@ -73,6 +66,6 @@ iface br-lan inet static
 # LAN convidados
 auto br-gst
 iface br-gst inet manual
-    bridge_ports bond-gst
+    bridge_ports bond0.2
     bridge-stp off
     bridge-fd 0
