@@ -1,0 +1,78 @@
+#Configuração de rede do meu servidor.
+  
+source /etc/network/interfaces.d/*
+
+#Loopback
+auto lo
+iface lo inet loopback
+
+#Ativação das interfaces
+auto eth0
+iface eth0 inet manual
+
+auto eth1
+iface eth1 inet manual
+
+auto eth2
+iface eth2 inet manual
+
+auto eth3
+iface eth3 inet manual
+
+auto eth4
+iface eth4 inet manual
+
+#WAN primária
+auto br-wan0
+iface br-wan0 inet manual
+    bridge_ports eth0
+
+#WAN secundária
+auto br-wan1
+iface br-wan1 inet manual
+    bridge_ports eth1
+
+# Configuração agregação de links
+auto bond0
+iface bond0 inet manual
+    bond-mode balance-alb #Distribui carga de transmissão e recepção dinamicamente
+#   bond-mode balance-tlb #Apenas balanceia transmissões (recepção é limitada a um link)
+    bond-miimon 100
+    bond-slaves eth2 eth3
+
+# VLANs sobre bond0
+auto bond-lan
+iface bond-lan inet manual
+    vlan-raw-device bond0
+    vlan-id 0
+
+auto bond-gst
+iface bond-gst inet manual
+    vlan-raw-device bond0
+    vlan-id 2
+
+# Interface de console
+auto br-con
+iface br-con inet static
+    bridge_ports eth4
+    bridge-stp off
+    bridge-fd 0
+    address 10.0.255.1
+    netmask 255.255.255.252
+
+# LAN principal
+auto br-lan
+iface br-lan inet static
+    bridge_ports bond-lan
+    bridge-stp off
+    bridge-fd 0
+    address 10.0.100.10
+    netmask 255.255.255.0
+    gateway 10.0.100.1
+
+# LAN convidados
+auto br-gst
+iface br-gst inet manual
+    bridge_ports bond-gst
+    bridge-stp off
+    bridge-fd 0
