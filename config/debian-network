@@ -44,10 +44,13 @@ iface bond0 inet manual
 auto bond0.2
 iface bond0.2 inet manual
 
+auto bond0.3
+iface bond0.3 inet manual
+
 # Interface de console
 auto br-con
 iface br-con inet static
-    bridge_ports eth4
+    bridge_ports eth4 bond0.3
     bridge-stp off
     bridge-fd 0
     address 10.0.255.1
