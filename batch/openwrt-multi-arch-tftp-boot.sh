@@ -54,3 +54,4 @@ uci set dhcp.@boot[-1].servername="$SERVER_NAME"
 
 uci commit dhcp
 service dnsmasq reload
+#Em caso de dúvida confira a documentação do OpenWRT: https://openwrt.org/docs/guide-user/base-system/dhcp_configuration#multi-arch_tftp_boot
